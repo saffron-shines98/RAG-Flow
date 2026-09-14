@@ -1,0 +1,23 @@
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Environment Variables (SECRETS - kabhi commit mat karo!)
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# ChromaDB Data (bada aur regenerate ho sakta hai)
+chroma_store/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
