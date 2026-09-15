@@ -127,3 +127,88 @@ User → POST /ask (routers/ask.py)
 
 Har layer ka apna kaam hai — router sirf request/response handle karta hai,
 service business logic karti hai, schema data ka shape define karta hai.
+
+
+
+# MULTI_FORMAT_SUPPORT.md — Multiple File Types Handle Karna
+
+Ab ye RAG system sirf PDF nahi, **PDF, DOCX, TXT, aur Images (JPG/PNG)** sab
+handle kar sakta hai.
+
+## Architecture — "Loader" Pattern
+
+```
+app/services/
+├── document_loader_service.py   → DISPATCHER (extension dekh ke sahi loader choose karta hai)
+└── loaders/
+    ├── pdf_loader.py             → PDF se text (pypdf)
+    ├── docx_loader.py            → Word docs se text (python-docx)
+    ├── txt_loader.py             → Plain text files
+    └── image_loader.py           → Images se OCR text (pytesseract)
+```
+
+**Design principle:** `rag_service.py` ko ye pata hi nahi ki file kaunsa format hai -
+wo sirf `document_loader_service.extract_text(file_path)` call karta hai, aur
+dispatcher andar se sahi loader chala deta hai. Isse **naya format add karna**
+bahut aasan hai - sirf ek naya loader file banao aur dispatcher mein register karo,
+baaki KUCH touch nahi karna.
+
+## Setup — Images (OCR) Ke Liye Extra Step
+
+PDF, DOCX, TXT ke liye koi extra setup nahi chahiye - `pip install -r requirements.txt`
+se kaam ho jayega.
+
+**Images ke liye, ek system-level program install karna hoga** (Tesseract OCR engine):
+
+1. https://github.com/UB-Mannheim/tesseract/wiki se Windows installer download karo
+2. Install karo (default options)
+3. `app/services/loaders/image_loader.py` file mein, ye lines UNCOMMENT karo aur
+   apna install-path daalo:
+```python
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+```
+
+**Mac:** `brew install tesseract` (uske baad koi extra config nahi chahiye)
+**Linux:** `sudo apt install tesseract-ocr`
+
+## Test Karne Ka Tarika
+
+`/ingest` endpoint mein ab koi bhi supported file bhej sakte ho:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/ingest" -F "file=@resume.docx"
+curl -X POST "http://127.0.0.1:8000/ingest" -F "file=@notes.txt"
+curl -X POST "http://127.0.0.1:8000/ingest" -F "file=@scanned_page.jpg"
+```
+
+Agar unsupported format bhejo (jaise `.mp3`), clear error milega:
+```json
+{ "detail": "Ye format supported nahi hai. Supported formats: .pdf, .docx, .txt, .png, .jpg, .jpeg" }
+```
+
+## Naya Format Add Karna Ho (Future) — Example: Excel/.csv
+
+1. `app/services/loaders/csv_loader.py` banao:
+```python
+import csv
+
+def extract_text(file_path: str) -> str:
+    with open(file_path, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        return "\n".join(", ".join(row) for row in reader)
+```
+
+2. `document_loader_service.py` mein register karo:
+```python
+from app.services.loaders import csv_loader
+SUPPORTED_LOADERS[".csv"] = csv_loader.extract_text
+```
+
+Bas! Koi aur file touch nahi karni padegi.
+
+## OCR Ki Limitation Samajhna Zaroori
+
+- **Image quality** matter karti hai - dhundhla/tedha photo se galat text nikal sakta hai
+- **Handwriting** OCR se acche se nahi padhi jati (Tesseract printed text ke liye best hai)
+- Agar OCR ka result kharab lage, image ko crop/straighten/higher-resolution karke try karo

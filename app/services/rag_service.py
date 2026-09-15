@@ -1,35 +1,35 @@
 import os
 import uuid
 from app.core.config import settings
-from app.services.pdf_service import extract_text_from_pdf
+from app.services import document_loader_service
 from app.services.chunking_service import chunk_text
 from app.services.embedding_service import embed_texts
 from app.services.vector_store_service import store_chunks, search_similar_chunks, list_all_sources
-from app.services.llm_service import generate_answer
+from app.services.llm_service import generate_answer, generate_general_answer
 from app.services import memory_service
 
 
-def ingest_document(pdf_path: str, session_id: str = None) -> dict:
+def ingest_document(file_path: str, session_id: str = None) -> dict:
     """
-    PDF -> text -> chunks -> embeddings -> ChromaDB store (source-tagged)
-    Fir is PDF ko session_id ke saath "attach" kar deta hai.
+    Koi bhi supported file (PDF/DOCX/TXT/Image) -> text -> chunks -> embeddings -> ChromaDB store
+    Fir is document ko session_id ke saath "attach" kar deta hai.
 
-    Agar session_id nahi diya gaya, ek NAYA unique session_id khud generate hota hai
-    (jaise ChatGPT mein naya chat start hone pe naya thread-ID banta hai).
+    Agar session_id nahi diya gaya, ek NAYA unique session_id khud generate hota hai.
 
     Returns: {"chunks_created": int, "session_id": str}
     """
     if not session_id:
-        session_id = str(uuid.uuid4())[:8]   # chota, readable unique ID jaise "a1b2c3d4"
+        session_id = str(uuid.uuid4())[:8]
 
-    source_filename = os.path.basename(pdf_path)
+    source_filename = os.path.basename(file_path)
 
-    raw_text = extract_text_from_pdf(pdf_path)
+    # DISPATCHER decide karta hai kaunsa loader use karna hai (extension ke hisaab se)
+    raw_text = document_loader_service.extract_text(file_path)
+
     chunks = chunk_text(raw_text, settings.CHUNK_SIZE, settings.CHUNK_OVERLAP)
     embeddings = embed_texts(chunks)
     store_chunks(chunks, embeddings, source_filename)
 
-    # Is session (chat) ke saath is PDF ko link kar do
     memory_service.add_document_to_session(session_id, source_filename)
 
     return {"chunks_created": len(chunks), "session_id": session_id}
@@ -78,3 +78,24 @@ def get_available_documents() -> list[str]:
 def reset_conversation(session_id: str) -> None:
     """Session ki history AUR attached documents, dono clear karta hai."""
     memory_service.clear_session(session_id)
+
+
+def general_chat(question: str, session_id: str = "default") -> dict:
+    """
+    Document-free general conversation - jaise normal ChatGPT/Claude chat.
+    Same memory_service use hoti hai, isliye ek hi session mein user
+    kabhi document ke baare mein poochh sakta hai, kabhi general baat.
+    """
+    chat_history = memory_service.get_history(session_id)
+    answer = generate_general_answer(question, chat_history)
+    memory_service.add_turn(session_id, question, answer)
+
+    return {
+        "question": question,
+        "answer": answer,
+        "session_id": session_id,
+    }
+
+def get_session_documents(session_id: str) -> list[str]:
+    """Kisi specific session/chat ke saath abhi tak kaunsi files attached hain."""
+    return memory_service.get_session_documents(session_id)

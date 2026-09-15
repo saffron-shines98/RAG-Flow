@@ -34,3 +34,17 @@ class IngestResponse(BaseModel):
 
 class ResetSessionRequest(BaseModel):
     session_id: str = Field(default="default")
+
+class ChatRequest(BaseModel):
+    question: str = Field(..., description="User ka message", min_length=1)
+    session_id: str = Field(default="default", description="Conversation ko track karne ke liye")
+
+
+class ChatResponse(BaseModel):
+    question: str
+    answer: str
+    session_id: str
+
+
+class DocumentsListResponse(BaseModel):
+    documents: List[str]

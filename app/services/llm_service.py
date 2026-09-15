@@ -7,7 +7,7 @@ final answer generate karna.
 
 from groq import Groq
 from app.core.config import settings
-from app.core.prompts import RAG_SYSTEM_PROMPT, build_user_prompt
+from app.core.prompts import RAG_SYSTEM_PROMPT, build_user_prompt, GENERAL_CHAT_SYSTEM_PROMPT
 
 _client = None  # lazy singleton
 
@@ -37,5 +37,24 @@ def generate_answer(question: str, context_chunks: list[dict], chat_history: lis
         model=settings.GROQ_MODEL,
         messages=messages,
         temperature=0.2,
+    )
+    return response.choices[0].message.content
+
+def generate_general_answer(question: str, chat_history: list[dict] = None) -> str:
+    """
+    General conversation ke liye - koi document context NAHI, seedha LLM se
+    baat (jaise ChatGPT). Sirf chat_history use hoti hai continuity ke liye.
+    """
+    chat_history = chat_history or []
+
+    messages = [{"role": "system", "content": GENERAL_CHAT_SYSTEM_PROMPT}]
+    messages.extend(chat_history)
+    messages.append({"role": "user", "content": question})
+
+    client = get_groq_client()
+    response = client.chat.completions.create(
+        model=settings.GROQ_MODEL,
+        messages=messages,
+        temperature=0.7,  # HIGH - general chat mein natural variety acchi lagti hai
     )
     return response.choices[0].message.content
