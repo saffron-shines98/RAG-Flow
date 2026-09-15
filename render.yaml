@@ -1,0 +1,12 @@
+services:
+
+  - type: web
+    name: trackflow-rag
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: GROQ_API_KEY_new
+        sync: false
+
+
