@@ -11,3 +11,5 @@ sentence-transformers==3.0.1
 chromadb==0.5.5
 groq==0.11.0
 httpx==0.27.2
+tavily-python
+upstash-redis==1.2.0

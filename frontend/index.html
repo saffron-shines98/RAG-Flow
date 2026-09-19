@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TrackFlow</title>
+<link rel="icon" href="data:,">
 <style>
   :root{
     --grad: linear-gradient(135deg, #7B2FF7 0%, #E1306C 50%, #F77737 100%);
@@ -402,7 +403,49 @@
     .app{ grid-template-columns: 1fr; }
     .sidebar{ display:none; }
   }
+
+  /* ---------- Rendered markdown inside assistant bubbles (NEW) ---------- */
+  .bubble pre{
+    background:#1e1e1e;
+    padding:12px 14px;
+    border-radius:10px;
+    overflow-x:auto;
+    margin:8px 0;
+  }
+  .copy-btn{
+    position:absolute; top:8px; right:8px;
+    background:#333; color:#ccc; border:none;
+    padding:4px 10px; border-radius:6px;
+    font-size:11px; cursor:pointer;
+    opacity:0.7; transition:opacity 0.15s ease;
+  }
+  .copy-btn:hover{ opacity:1; }
+  .bubble code{
+    font-family: "Fira Code", Consolas, monospace;
+    font-size:13px;
+  }
+  .bubble p code, .bubble li code{
+    background:#eee3;
+    padding:2px 5px;
+    border-radius:4px;
+  }
+  .bubble ul, .bubble ol{
+    margin:6px 0;
+    padding-left:22px;
+  }
+  .bubble p{
+    margin:0 0 8px;
+  }
+  .bubble p:last-child{
+    margin-bottom:0;
+  }
 </style>
+
+<!-- NEW: markdown parsing + sanitizing + code syntax highlighting -->
+<script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 </head>
 <body>
 
@@ -512,7 +555,37 @@
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
+
+    // --- NEW: render assistant markdown as HTML; keep user text as plain text ---
+    if (who === "user") {
+      bubble.textContent = text;
+    } else if (typeof marked !== "undefined" && typeof DOMPurify !== "undefined") {
+    const rawHtml = marked.parse(text);
+    bubble.innerHTML = DOMPurify.sanitize(rawHtml);
+
+    bubble.querySelectorAll("pre").forEach((preBlock) => {
+      const codeBlock = preBlock.querySelector("code");
+      if (codeBlock && typeof hljs !== "undefined") {
+        hljs.highlightElement(codeBlock);
+      }
+
+      // NEW: copy button add karo
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "copy-btn";
+      copyBtn.textContent = "Copy";
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(codeBlock ? codeBlock.textContent : preBlock.textContent);
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+      });
+      preBlock.style.position = "relative";
+      preBlock.appendChild(copyBtn);
+    });
+  } else {
+    // CDN load nahi hua (internet/ad-blocker issue) - fallback to plain text
     bubble.textContent = text;
+  }
+    // --- end NEW ---
 
     row.appendChild(avatar);
     row.appendChild(bubble);

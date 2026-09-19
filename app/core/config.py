@@ -18,7 +18,12 @@ load_dotenv()  # .env file ko environment variables mein load karta hai
 class Settings:
     # --- Groq LLM Settings ---
     GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
+    TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
     GROQ_MODEL: str = "openai/gpt-oss-20b"
+
+     # --- Redis (Upstash) — conversation memory persistence ---
+    UPSTASH_REDIS_URL: str = os.environ.get("UPSTASH_REDIS_URL", "")
+    UPSTASH_REDIS_TOKEN: str = os.environ.get("UPSTASH_REDIS_TOKEN", "")
 
     # --- Embedding Settings ---
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
